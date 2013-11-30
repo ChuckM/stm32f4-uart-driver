@@ -11,6 +11,9 @@
  * ------------------------     ---------------------------------------
  *                              Debugging Initialized
  * UART Driver Test Program     [Press Space] (you need to press space)
+ * Some tests of the number
+ * formatting code. Then the
+ * prompt :
  * Enter some text : <enter text>
  * 'what you entered'
  * Enter some text :
@@ -27,6 +30,7 @@ int
 main(void) {
     int u;
     char buf[128];
+    int n;
 
     clock_init(1000);
     debug_init();
@@ -34,6 +38,19 @@ main(void) {
     u = uart_init(PC6, PC7, 115200);
     uart_puts(u, greet);
     debug_wait();
+    uart_puts(u, "Testing number formatting.\n");
+    uart_puts(u, "Address of buf is : ");
+    uart_putnum(u, FMT_HEX_CONSTANT | FMT_NEWLINE, (uint32_t) &buf[0]);
+    uart_puts(u, "Number test sequence :\n");
+    for (n = 0; n < 25; n++) {
+        uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_8 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BINARY_BYTE | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM | FMT_NEWLINE, n);
+    }
     while (1) {
         uart_puts(u, "Enter some text: ");
         uart_gets(u, buf, 128);

@@ -17,6 +17,10 @@
 #include "clock.h"
 #include "debug.h"
 
+#ifndef NULL
+#define NULL (char *)(0)
+#endif
+
 /* Until libopencm3 gets defines for the STM32F42[79] which have
  * two additional UARTS
  */
@@ -386,6 +390,9 @@ uart_putc(int chan, char c) {
  */
 void
 uart_puts(int chan, const char *s) {
+    if (s == NULL)
+        return;
+
     while (*s) {
         if (*s == '\n') {
             uart_putc(chan, '\r');
@@ -719,104 +726,248 @@ uart_pin_map(enum UART_PORT_PIN pin, enum PIN_ATTRIBUTE attr) {
     }
 }
 
-static int field_size(int, int);
-/*
- * field_size - compute the number of characters needed to
- * represent a number in base 'base' with 'size' bytes in it
- */
-static int
-field_size(int base, int size) {
-    // compute field size (number of characters)
-    if ((size != 1) && (size != 2) && (size != 4)) {
-        return 0;
-    }
-    switch (base) {
-        case 2:
-            return size * 8;
-            break;
-        case 8:
-            return ((size * 8) + 2) / 3;
-        case 10:
-            return (size == 1) ? 3 : (size * 8) / 3;
-        case 16:
-            return size * 2;
-        default:
-            return 0;
-    }
-}
-
 /*
  * Convert a number to a string in the desired
- * base assuming a given size (in bytes).
+ * base.
+ *
  * Assumes:
  *      - buf has enough space (up to 33 bytes for
  *        a 32 bit number in binary)
  * Verifies:
  *      - base is one of 2, 8, 10, or 16
- *      - size is one of 1, 2, or 4 (no long long)
+ * Creates:
+ *      - null string on error ("")
+ *
+ *                                d
+ *                                V
+ *       [ ] [6] [5] [4] [3] [2] [1] 
+ *        ^
+ *       buf
+ *
+ *       do {
+ *          *b ^= *d;
+ *          *d ^= *b;
+ *          *b ^= *d;
+ *       } while (++b < --d);
+ *
+ *      buf must have 33 bytes behind it, worst case!
  */
 void
-ntoa(uint32_t val, char *buf, int base, int size) {
-    int ndx;
+ntoa(uint32_t val, char *buf, int base) {
+    char *d;
 
-    *buf = '\000';
-    if ( ((size != 1) && (size != 2) && (size != 4)) ||
-        ((base != 2) && (base != 10) && (base != 16)))  {
-        return; // bad size or base parameter
-    }
-    ndx = field_size(base, size);
-    if (! ndx) {
-        return;
-    }
+    d = buf;
+    *d = '\000';
+    d++;
 
-    // only consider the relavent number of bits  (8/16/32)
-    switch (size) {
-        case 1:
-            val &= 0xff;
-            break;
-        case 2:
-            val &= 0xffff;
-        default:
-            break;
+    if ((base != 8) && (base != 2) && (base != 10) && (base != 16))  {
+        return; // bad base parameter
     }
-
-    *(buf+ndx) = 0;
-    while (ndx > 0) {
-        *(buf + (ndx-1)) = ((val % base) < 10) ? (val % base) + '0' :
+    if (val == 0) {
+        *d = '0';
+    } else {
+        while (val > 0) {
+            *d = ((val % base) < 10) ? (val % base) + '0' :
                                                  (val % base) + '7';
-        val /= base;
-        ndx--;
+            val /= base;
+            d++;
+        }
+        d--; // backup to the last digit stored.
     }
+    /*
+     * So how often do you get to use an interview question in your
+     * code? 
+     * At this point the string is in buf, only backwards so reverse it
+     * in place.
+     */
+    do {
+        *d ^= *buf;
+        *buf ^= *d;
+        *d ^= *buf;
+    } while (++buf < --d);
     return;
 }
 
 /*
  * Convert a string to a number in the desired
- * base assuming a given size (in bytes).
+ * 
  * Assumes:
  *      - buf has enough space (up to 33 bytes for
  *        a 32 bit number in binary)
+ *      - Stops at first non-legal digit in specified
+ *        base or NUL character.
  * Verifies:
- *      - base is one of 2, 10, or 16 (no octal)
- *      - size is one of 1, 2, or 4 (no long long)
+ *      - base is one of 2, 8, 10, or 16 (no octal)
+ * Returns:
+ *      - 0 even on failure.
  */
 uint32_t
-aton(char *buf, int base, int size) {
+aton(char *buf, int base) {
     uint32_t res;
-    int ndx;
     uint8_t digit;
 
     res = 0;
-    ndx = field_size(base, size);
-    if (!ndx) {
+    if ((base != 2) && (base != 8) && (base != 10) && (base != 16)) {
         return 0;
     }
-    while (ndx > 0) {
+    while (*buf != '\000') {
         digit = (*buf > '9') ? (*buf - '7') : (*buf - '0');
+        if (((base == 2) && (digit > 1)) ||
+            ((base == 8) && (digit > 7)) ||
+            ((base == 10) && (digit > 9)) ||
+            ((base == 16) && (digit > 15))) {
+            return res;
+        }
         res *= base;
         res += digit;
-        ndx--;
         buf++;
     }
     return res;
+}
+
+
+/*
+ * Print a number given various formatting options.
+ * NB: No floating point yet. 
+ *
+ * This got a bit out of hand but I wanted just *one* number printing
+ * function rather than several. 
+ *
+ * Notes from my notebook:
+ * Number consists of:
+ *
+ *      PREFIX|NUMBER|SUFFIX
+ *     |------ width -------|
+ *     |------ field width -----|
+
+ * Prefix is one of "", "-", "0x", "0b", "0", "-0x" "-0b", "-0"
+ * Suffix is one of "", ".0"
+ *
+ * The independent variable is the leading zero question.
+ * So when LEADING ZERO is set you pad the width of Number to fill
+ * the width, up to 32 bits of precision.
+ *
+ * With LEFT adjust you pad right, without it you pad left.
+ *
+ * Examples:
+ *   0x12345000 - hex + alternate form
+ *     1234abcd - just hex 
+ *           0C - hex + width of 2 + leading 0
+ *         10.0 - decimal + alternate form
+ *      0b11011 - Binary + alternate form
+ *   0b00011011 - Binary + alternate form + leading 0 + 8 digits
+ *   123        - Decimal + left adjust + width of 10
+ *          010 - octal
+ * 037777777777 - octal equivalent of -1
+ *         -1.0 - decimal + sign + alternate form (adds the .0)
+ *
+ */
+void
+uart_putnum(int chan, uint16_t fmt, uint32_t num) {
+    char buf[33];
+    int width;
+    char *prefix;
+    char *suffix;
+    char *t;
+    int n_width, ps_width, pad;
+    int sign_bit = 0;
+
+    width = fmt & FMT_WIDTH_MASK;
+    n_width = 0; // total number width
+    ps_width = 0;
+    sign_bit = 0;
+    if ((fmt & FMT_SIGNED) && ((num & 0x80000000) != 0)) {
+        num = -num; // force value to be postive
+        sign_bit++; // remember to put the '-' on later
+        ps_width++;
+    }
+    prefix = NULL;
+    suffix = NULL;
+    if (fmt & (FMT_ALTERNATE_FORM | FMT_BASE_MASK)) {
+        switch (fmt & FMT_BASE_MASK) {
+            case FMT_BASE_2:
+                ntoa(num, buf, 2);
+                prefix = (sign_bit) ? "-0b" : "0b";
+                ps_width += 2;
+                break;
+            case FMT_BASE_8:
+                ntoa(num, buf, 8);
+                prefix = (sign_bit) ? "-0" : "0";
+                ps_width++;
+                break;
+            case FMT_BASE_16:
+                ntoa(num, buf, 16);
+                prefix = (sign_bit) ? "-0x" : "0x";
+                ps_width += 2;
+                break;
+            case FMT_BASE_10:
+                ntoa(num, buf, 10);
+                prefix = (sign_bit) ? "-" : "";
+                suffix = ".0";
+                ps_width += 2;        /* do this for decimal too since we add .0 in that case */
+                break;
+        }
+    }
+    /*
+     * Look for the start of the number
+     * (first non-zero, or only zero) and count from
+     * there forward to get number width.
+     */
+    n_width = 0; // number is initially zero length;
+    for (t = &buf[0]; *t != '\000'; t++) {
+        n_width++;
+    }
+    pad = width - (n_width + ps_width); 
+
+    /*
+     * Ok, now we've got ps_width (prefix + suffix width), n_width (width of the actual number)
+     * and buf has had zeros removed if necessary ?
+     * Now we have three actions:
+     * width is unset 
+     *      - send out prefix:number:suffix
+     * width is set and ZEROS is set 
+     *      - subtract prefix/suffix length from width,
+     *      - subtract number width from width => n_pad
+     *      - print prefix, print n_pad zeros, print number, print suffix
+     * width is set and ZEROs is not set
+     *      - subtract prefix+suffix+number width from width
+     *      - if Left adjust
+     *          print prefix:num:suffix then pad spaces
+     *      - else
+     *          print pad spaces then prefix:num:suffix
+     */
+    if ((width == 0) || (pad < 0)) {
+        // simple case, no width, or overflow width, just print it.
+        uart_puts(chan, prefix);
+        uart_puts(chan, buf);
+        uart_puts(chan, suffix);
+    } else {
+        if (fmt & FMT_LEADING_ZERO) {
+            uart_puts(chan, prefix);
+            while (pad-- > 0) {
+                uart_putc(chan, '0');
+            }
+            uart_puts(chan, buf);
+            uart_puts(chan, suffix);
+        } else {
+            if (fmt & FMT_LEFT_ADJUST) {
+                uart_puts(chan, prefix);
+                uart_puts(chan, buf);
+                uart_puts(chan, suffix);
+                while (pad-- > 0) {
+                    uart_putc(chan, ' ');
+                }
+            } else {
+                while (pad-- > 0) {
+                    uart_putc(chan, ' ');
+                }
+                uart_puts(chan, prefix);
+                uart_puts(chan, buf);
+                uart_puts(chan, suffix);
+            }
+        }
+    }
+    if (fmt & FMT_NEWLINE) {
+        uart_puts(chan, "\n");
+    }
 }
