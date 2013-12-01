@@ -883,30 +883,36 @@ uart_putnum(int chan, uint16_t fmt, uint32_t num) {
     }
     prefix = NULL;
     suffix = NULL;
-    if (fmt & (FMT_ALTERNATE_FORM | FMT_BASE_MASK)) {
-        switch (fmt & FMT_BASE_MASK) {
-            case FMT_BASE_2:
-                ntoa(num, buf, 2);
+    switch (fmt & FMT_BASE_MASK) {
+        case FMT_BASE_2:
+            ntoa(num, buf, 2);
+            if (fmt & FMT_ALTERNATE_FORM) {
                 prefix = (sign_bit) ? "-0b" : "0b";
                 ps_width += 2;
-                break;
-            case FMT_BASE_8:
-                ntoa(num, buf, 8);
+            }
+            break;
+        case FMT_BASE_8:
+            ntoa(num, buf, 8);
+            if (fmt & FMT_ALTERNATE_FORM) {
                 prefix = (sign_bit) ? "-0" : "0";
                 ps_width++;
-                break;
-            case FMT_BASE_16:
-                ntoa(num, buf, 16);
+            }
+            break;
+    case FMT_BASE_16:
+            ntoa(num, buf, 16);
+            if (fmt & FMT_ALTERNATE_FORM) {
                 prefix = (sign_bit) ? "-0x" : "0x";
                 ps_width += 2;
-                break;
-            case FMT_BASE_10:
-                ntoa(num, buf, 10);
+            }
+            break;
+    case FMT_BASE_10:
+            ntoa(num, buf, 10);
+            if (fmt & FMT_ALTERNATE_FORM) {
                 prefix = (sign_bit) ? "-" : "";
                 suffix = ".0";
                 ps_width += 2;        /* do this for decimal too since we add .0 in that case */
-                break;
-        }
+            }
+            break;
     }
     /*
      * Look for the start of the number

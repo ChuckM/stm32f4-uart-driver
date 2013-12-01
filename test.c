@@ -49,7 +49,12 @@ main(void) {
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BINARY_BYTE | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM | FMT_NEWLINE, n);
+        uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 2, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 8, n);
+        uart_puts(u, "\n");
     }
     while (1) {
         uart_puts(u, "Enter some text: ");
