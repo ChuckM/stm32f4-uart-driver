@@ -864,43 +864,6 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
     }
     return;
 }
-#if 0
-void
-ntoa(uint32_t val, char *buf, int base) {
-    char *d;
-
-    d = buf;
-    *d = '\000';
-    d++;
-
-    if ((base != 8) && (base != 2) && (base != 10) && (base != 16))  {
-        return; // bad base parameter
-    }
-    if (val == 0) {
-        *d = '0';
-    } else {
-        while (val > 0) {
-            *d = ((val % base) < 10) ? (val % base) + '0' :
-                                                 (val % base) + '7';
-            val /= base;
-            d++;
-        }
-        d--; // backup to the last digit stored.
-    }
-    /*
-     * So how often do you get to use an interview question in your
-     * code? 
-     * At this point the string is in buf, only backwards so reverse it
-     * in place.
-     */
-    do {
-        *d ^= *buf;
-        *buf ^= *d;
-        *d ^= *buf;
-    } while (++buf < --d);
-    return;
-}
-#endif
 /*
  * Convert a string to a number in the desired
  * 
@@ -975,7 +938,6 @@ aton(char *buf, int base) {
  *         -1.0 - decimal + sign + alternate form (adds the .0)
  *
  */
-#if 1
 void
 uart_putnum(int chan, uint16_t fmt, uint32_t num) {
     char buf[48];
@@ -986,120 +948,3 @@ uart_putnum(int chan, uint16_t fmt, uint32_t num) {
         uart_puts(chan, "\n");
     }
 }
-#else
-void
-uart_putnum(int chan, uint16_t fmt, uint32_t num) {
-    char buf[33];
-    int width;
-    char *prefix;
-    char *suffix;
-    char *t;
-    int n_width, ps_width, pad;
-    int sign_bit = 0;
-
-    width = fmt & FMT_WIDTH_MASK;
-    n_width = 0; // total number width
-    ps_width = 0;
-    sign_bit = 0;
-    if ((fmt & FMT_SIGNED) && ((num & 0x80000000) != 0)) {
-        num = -num; // force value to be postive
-        sign_bit++; // remember to put the '-' on later
-        ps_width++;
-    }
-    prefix = NULL;
-    suffix = NULL;
-    switch (fmt & FMT_BASE_MASK) {
-        case FMT_BASE_2:
-            ntoa(num, buf, 2);
-            if (fmt & FMT_ALTERNATE_FORM) {
-                prefix = (sign_bit) ? "-0b" : "0b";
-                ps_width += 2;
-            }
-            break;
-        case FMT_BASE_8:
-            ntoa(num, buf, 8);
-            if (fmt & FMT_ALTERNATE_FORM) {
-                prefix = (sign_bit) ? "-0" : "0";
-                ps_width++;
-            }
-            break;
-    case FMT_BASE_16:
-            ntoa(num, buf, 16);
-            if (fmt & FMT_ALTERNATE_FORM) {
-                prefix = (sign_bit) ? "-0x" : "0x";
-                ps_width += 2;
-            }
-            break;
-    case FMT_BASE_10:
-            ntoa(num, buf, 10);
-            if (fmt & FMT_ALTERNATE_FORM) {
-                prefix = (sign_bit) ? "-" : "";
-                suffix = ".0";
-                ps_width += 2;        /* do this for decimal too since we add .0 in that case */
-            }
-            break;
-    }
-    /*
-     * Look for the start of the number
-     * (first non-zero, or only zero) and count from
-     * there forward to get number width.
-     */
-    n_width = 0; // number is initially zero length;
-    for (t = &buf[0]; *t != '\000'; t++) {
-        n_width++;
-    }
-    pad = width - (n_width + ps_width); 
-
-    /*
-     * Ok, now we've got ps_width (prefix + suffix width), n_width (width of the actual number)
-     * and buf has had zeros removed if necessary ?
-     * Now we have three actions:
-     * width is unset 
-     *      - send out prefix:number:suffix
-     * width is set and ZEROS is set 
-     *      - subtract prefix/suffix length from width,
-     *      - subtract number width from width => n_pad
-     *      - print prefix, print n_pad zeros, print number, print suffix
-     * width is set and ZEROs is not set
-     *      - subtract prefix+suffix+number width from width
-     *      - if Left adjust
-     *          print prefix:num:suffix then pad spaces
-     *      - else
-     *          print pad spaces then prefix:num:suffix
-     */
-    if ((width == 0) || (pad < 0)) {
-        // simple case, no width, or overflow width, just print it.
-        uart_puts(chan, prefix);
-        uart_puts(chan, buf);
-        uart_puts(chan, suffix);
-    } else {
-        if (fmt & FMT_LEADING_ZERO) {
-            uart_puts(chan, prefix);
-            while (pad-- > 0) {
-                uart_putc(chan, '0');
-            }
-            uart_puts(chan, buf);
-            uart_puts(chan, suffix);
-        } else {
-            if (fmt & FMT_LEFT_ADJUST) {
-                uart_puts(chan, prefix);
-                uart_puts(chan, buf);
-                uart_puts(chan, suffix);
-                while (pad-- > 0) {
-                    uart_putc(chan, ' ');
-                }
-            } else {
-                while (pad-- > 0) {
-                    uart_putc(chan, ' ');
-                }
-                uart_puts(chan, prefix);
-                uart_puts(chan, buf);
-                uart_puts(chan, suffix);
-            }
-        }
-    }
-    if (fmt & FMT_NEWLINE) {
-        uart_puts(chan, "\n");
-    }
-}
-#endif
