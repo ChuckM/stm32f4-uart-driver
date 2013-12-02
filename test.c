@@ -34,26 +34,26 @@ main(void) {
 
     clock_init(1000);
     debug_init();
-    debug_puts("Debugging initialized.\n");
+    debug_puts("\n---------- new session --------------\nDebugging initialized.\n");
     u = uart_init(PC6, PC7, 115200);
     uart_puts(u, greet);
-    debug_wait();
+    // debug_wait();
     uart_puts(u, "Testing number formatting.\n");
     uart_puts(u, "Address of buf is : ");
     uart_putnum(u, FMT_HEX_CONSTANT | FMT_NEWLINE, (uint32_t) &buf[0]);
     uart_puts(u, "Number test sequence :\n");
-    for (n = 0; n < 25; n++) {
-        uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM, n);
+    for (n = -10; n < 10; n++) {
+        uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM | FMT_SIGNED, n);
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BASE_8 | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BINARY_BYTE | FMT_ALTERNATE_FORM, n);
+        uart_putnum(u, FMT_BASE_2 | FMT_LEADING_ZERO | FMT_ALTERNATE_FORM | 10, n & 0xff);
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 2, n);
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 2, n & 0xff);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 8, n);
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 8, n & 0xffff);
         uart_puts(u, "\n");
     }
     while (1) {

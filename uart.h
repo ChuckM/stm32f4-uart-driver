@@ -44,11 +44,11 @@ enum UART_PORT_PIN {
 #define FMT_BASE_8          2 << 5
 #define FMT_BASE_16         3 << 5
 #define FMT_BASE_MASK       3 << 5
-#define FMT_SIGNED          1 << 6
-#define FMT_LEADING_ZERO    1 << 7
-#define FMT_ALTERNATE_FORM  1 << 8
-#define FMT_LEFT_ADJUST     1 << 9
-#define FMT_NEWLINE         1 << 10
+#define FMT_SIGNED          1 << 7
+#define FMT_LEADING_ZERO    1 << 8
+#define FMT_ALTERNATE_FORM  1 << 9
+#define FMT_LEFT_ADJUST     1 << 10 
+#define FMT_NEWLINE         1 << 11
 #define FMT_DECIMAL         FMT_BASE_10 | FMT_ALTERNATE_FORM | FMT_SIGNED
 #define FMT_HEX_BYTE        FMT_BASE_16 | FMT_LEADING_ZERO | 1
 #define FMT_HEX_WORD        FMT_BASE_16 | FMT_LEADING_ZERO | 3
@@ -57,6 +57,12 @@ enum UART_PORT_PIN {
 #define FMT_BINARY_WORD     FMT_BASE_2 | FMT_LEADING_ZERO | 15
 #define FMT_BINARY_LONG     FMT_BASE_2 | FMT_LEADING_ZERO | 31
 #define FMT_HEX_CONSTANT    FMT_BASE_16 | FMT_ALTERNATE_FORM
+
+/* Formatting discussion :
+ * So the interesting thing here is that when you try to format -1 as
+ * a byte it shows up as FFFFFFFF rather than FF. So to get that behavior
+ * we're going to cut off the number if its all 1 bits.
+ */
 
 /* Prototypes */
 int uart_init(enum UART_PORT_PIN tx, enum UART_PORT_PIN rx, int baudrate);
@@ -67,6 +73,6 @@ void uart_puts(int channel, const char *s);
 char *uart_gets(int channel, char *s, int len);
 void uart_putnum(int channel, uint16_t fmt, uint32_t num);
 int uart_getnum(int channel, uint16_t fmt, uint32_t *num);
-void ntoa(uint32_t val, char *buf, int base);
+void ntoa(uint32_t val, uint16_t fmt, char *buf);
 uint32_t aton(char *buf, int base);
 #endif // __UART_H

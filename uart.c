@@ -750,8 +750,121 @@ uart_pin_map(enum UART_PORT_PIN pin, enum PIN_ATTRIBUTE attr) {
  *          *b ^= *d;
  *       } while (++b < --d);
  *
- *      buf must have 33 bytes behind it, worst case!
+ *      buf must have 35 bytes behind it, worst case!
  */
+void
+ntoa(uint32_t val, uint16_t fmt, char *buf) {
+    char *d;
+    int base, width;
+    int sign_bit = 0;
+
+    d = buf;
+    *d = '\000';
+    d++;
+    width = fmt & FMT_WIDTH_MASK;
+    base = 10;
+    if ((fmt & (FMT_SIGNED | FMT_BASE_MASK)) == (FMT_SIGNED | FMT_BASE_10)) {
+        sign_bit = ((val & 0x80000000) != 0);
+        val = (val & 0x80000000) ? -val : val;
+    }
+    switch (fmt & FMT_BASE_MASK) {
+        case FMT_BASE_2:
+            base = 2;
+            if (fmt & FMT_ALTERNATE_FORM) {
+                width = width - 2;
+            }
+            break;
+        case FMT_BASE_8:
+            base = 8;
+            if (fmt & FMT_ALTERNATE_FORM) {
+                width = width - 1;
+            }
+            break;
+        case FMT_BASE_16:
+            base = 16;
+            if (fmt & FMT_ALTERNATE_FORM) {
+                width = width - 2;
+            }
+            break;
+        case FMT_BASE_10:
+            base = 10;
+            if (fmt & FMT_ALTERNATE_FORM) {
+                *d++ = '0';
+                *d++ = '.';
+                width = width - 2;
+            }
+            break;
+    }
+
+    if (val == 0) {
+        *d++ = '0';
+    } else {
+        while (val > 0) {
+            *d++ = ((val % base) < 10) ? (val % base) + '0' :
+                                                 (val % base) + '7';
+            val /= base;
+            width--;
+        }
+    }
+
+    if (fmt & FMT_LEADING_ZERO) {
+        while (width > 0) {
+            *d++ = '0';
+            width--;
+        }
+    }
+    if (fmt & FMT_ALTERNATE_FORM) {
+        switch (fmt & FMT_BASE_MASK) {
+            case FMT_BASE_16:
+                *d++ = 'x';
+                *d++ = '0';
+                break;
+            case FMT_BASE_8:
+                *d++ = '0';
+                break;
+            case FMT_BASE_2:
+                *d++ = 'b';
+                *d++ = '0';
+            default:
+                break;
+        }
+    }
+    if (sign_bit) {
+        *d++ = '-';
+        width--;
+    }
+
+    if ((width > 0) && ((FMT_LEFT_ADJUST & fmt) == 0)) {
+        while (width) {
+            *d++ = ' ';
+            width--;
+        }
+    }
+    /*
+     * So how often do you get to use an interview question in your
+     * code? 
+     * At this point the string is in buf, only backwards so reverse it
+     * in place.
+     */
+    d--;    // Point d at last character
+    do {
+        *d ^= *buf;
+        *buf ^= *d;
+        *d ^= *buf;
+    } while (++buf < --d);
+    if ((width > 0) && ((FMT_LEFT_ADJUST & fmt) != 0)) {
+        while (*d != '\000') {
+            d++;
+        }
+        while (width) {
+            *d++ = ' ';
+            width--;
+        }
+        *d = '\000';
+    }
+    return;
+}
+#if 0
 void
 ntoa(uint32_t val, char *buf, int base) {
     char *d;
@@ -787,7 +900,7 @@ ntoa(uint32_t val, char *buf, int base) {
     } while (++buf < --d);
     return;
 }
-
+#endif
 /*
  * Convert a string to a number in the desired
  * 
@@ -862,6 +975,18 @@ aton(char *buf, int base) {
  *         -1.0 - decimal + sign + alternate form (adds the .0)
  *
  */
+#if 1
+void
+uart_putnum(int chan, uint16_t fmt, uint32_t num) {
+    char buf[48];
+
+    ntoa(num, fmt, buf);
+    uart_puts(chan, buf);
+    if (fmt & FMT_NEWLINE) {
+        uart_puts(chan, "\n");
+    }
+}
+#else
 void
 uart_putnum(int chan, uint16_t fmt, uint32_t num) {
     char buf[33];
@@ -977,3 +1102,4 @@ uart_putnum(int chan, uint16_t fmt, uint32_t num) {
         uart_puts(chan, "\n");
     }
 }
+#endif
