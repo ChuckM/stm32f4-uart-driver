@@ -864,30 +864,42 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
     }
     return;
 }
+
 /*
  * Convert a string to a number in the desired
  * 
  * Assumes:
- *      - buf has enough space (up to 33 bytes for
- *        a 32 bit number in binary)
- *      - Stops at first non-legal digit in specified
+ *      - Stops at first non-legal digit in guessed
  *        base or NUL character.
- * Verifies:
- *      - base is one of 2, 8, 10, or 16 (no octal)
  * Returns:
  *      - 0 even on failure.
  */
 uint32_t
-aton(char *buf, int base) {
-    uint32_t res;
+aton(char *buf) {
+    uint32_t res = 0;
+    int     base = 10;
+    char    *t = buf;
     uint8_t digit;
 
-    res = 0;
-    if ((base != 2) && (base != 8) && (base != 10) && (base != 16)) {
-        return 0;
+    /* check for different base indicators */
+    if ((*buf >= '1') && (*buf <= '9')) {
+        base = 10;
+    } else if ((*buf) == '0') {
+        buf++;
+        if (*buf == 'b') {
+            base = 2;
+            buf++;
+        } else if (*buf == 'x') {
+            base = 16;
+            buf++;
+        } else if ((*buf >= '0') && (*buf <= '7')) {
+            base = 8;
+        } else if (*buf = '\000') {
+            return 0;
+        }
     }
     while (*buf != '\000') {
-        digit = (*buf > '9') ? (*buf - '7') : (*buf - '0');
+        digit = (*buf > '9') ? ((*buf & 0xdf) - '7') : (*buf - '0');
         if (((base == 2) && (digit > 1)) ||
             ((base == 8) && (digit > 7)) ||
             ((base == 10) && (digit > 9)) ||

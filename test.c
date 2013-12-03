@@ -62,6 +62,17 @@ main(void) {
         uart_puts(u, "'");
         uart_puts(u, buf);
         uart_puts(u, "'");
-        uart_puts(u, "\n\r");
+        uart_puts(u, "\n");
+        uart_puts(u, "Enter a number : ");
+        uart_gets(u, buf, 128);
+        n = aton(buf);
+        uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_2 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_8 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, "\n");
     }
 }

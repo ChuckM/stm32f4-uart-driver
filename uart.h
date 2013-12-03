@@ -74,5 +74,5 @@ char *uart_gets(int channel, char *s, int len);
 void uart_putnum(int channel, uint16_t fmt, uint32_t num);
 int uart_getnum(int channel, uint16_t fmt, uint32_t *num);
 void ntoa(uint32_t val, uint16_t fmt, char *buf);
-uint32_t aton(char *buf, int base);
+uint32_t aton(char *buf);
 #endif // __UART_H
