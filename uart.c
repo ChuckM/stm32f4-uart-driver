@@ -731,81 +731,168 @@ uart_pin_map(enum UART_PORT_PIN pin, enum PIN_ATTRIBUTE attr) {
  * base.
  *
  * Assumes:
- *      - buf has enough space (up to 33 bytes for
+ *      - buf has enough space (up to 35 bytes for
  *        a 32 bit number in binary)
  * Verifies:
  *      - base is one of 2, 8, 10, or 16
  * Creates:
  *      - null string on error ("")
  *
- *                                d
- *                                V
- *       [ ] [6] [5] [4] [3] [2] [1] 
- *        ^
- *       buf
+ * This got a bit out of hand but I wanted just *one* number printing
+ * function rather than several. 
  *
- *       do {
- *          *b ^= *d;
- *          *d ^= *b;
- *          *b ^= *d;
- *       } while (++b < --d);
+ * Notes from my notebook:
+ * Number consists of:
  *
- *      buf must have 35 bytes behind it, worst case!
+ *      PREFIX|NUMBER|SUFFIX
+ *     |------ width -------|
+ *     |------ field width -----|
+
+ * Prefix is one of "", "-", "0x", "0b", "0", "-0x" "-0b", "-0"
+ * Suffix is one of "", ".0"
+ *
+ * The independent variable is the leading zero question.
+ * So when LEADING ZERO is set you pad the width of Number to fill
+ * the width, up to 32 digits of precision.
+ *
+ * With LEFT adjust you pad right, without it you pad left.
+ *
+ * Examples:
+ *   0x12345000 - hex + alternate form
+ *     1234abcd - just hex 
+ *           0C - hex + width of 1 byte + leading 0
+ *         10.0 - decimal + alternate form
+ *      0b11011 - Binary + alternate form
+ *   0b00011011 - Binary + alternate form + leading 0 + 1 byte
+ *      0100377 - octal + alternate form + 2 bytes
+ * 037777777777 - octal equivalent of -1
+ *         -1.0 - decimal + sign + alternate form (adds the .0)
+ *
+ * So I'm still going back and forth on the width. It would be handy
+ * to make it just 1, 2, or 4 for 1 byte value, 2 byte value, 4 byte
+ * value with 8 reserved for 8 byte value. As that is the common use
+ * case. And it would only apply to how many digits of the number were
+ * considered and not the field width.
  */
 void
 ntoa(uint32_t val, uint16_t fmt, char *buf) {
     char *d;
+    uint32_t mask;
     int base, width;
     int sign_bit = 0;
 
     d = buf;
     *d = '\000';
     d++;
-    width = fmt & FMT_WIDTH_MASK;
+    // defaults if not specified
+    mask = 0xffffffff;
     base = 10;
-    if ((fmt & (FMT_SIGNED | FMT_BASE_MASK)) == (FMT_SIGNED | FMT_BASE_10)) {
-        sign_bit = ((val & 0x80000000) != 0);
-        val = (val & 0x80000000) ? -val : val;
-    }
+    width = fmt & FMT_WIDTH_MASK;
+    /* sigh how to make this cleaner? */
     switch (fmt & FMT_BASE_MASK) {
         case FMT_BASE_2:
             base = 2;
-            if (fmt & FMT_ALTERNATE_FORM) {
-                width = width - 2;
+            switch (width) {
+                case 1:
+                    mask = 0xff;
+                    width = 8;
+                    break;  
+                case 2:
+                    mask = 0xffff;
+                    width = 16;
+                    break;
+                case 4:
+                    mask = 0xffffffff;
+                    width = 32;
+                    break;
+                default:
+                    width = 0;
+                    break;
             }
             break;
         case FMT_BASE_8:
             base = 8;
-            if (fmt & FMT_ALTERNATE_FORM) {
-                width = width - 1;
+            switch (width) {
+                case 1:
+                    mask = 0xff;
+                    width = 3;
+                    break;  
+                case 2:
+                    mask = 0xffff;
+                    width = 6;
+                    break;
+                case 4:
+                    mask = 0xffffffff;
+                    width = 11;
+                    break;
+                default:
+                    width = 0;
+                    break;
             }
             break;
         case FMT_BASE_16:
             base = 16;
-            if (fmt & FMT_ALTERNATE_FORM) {
-                width = width - 2;
+            switch (width) {
+                case 1:
+                    mask = 0xff;
+                    width = 2;
+                    break;  
+                case 2:
+                    mask = 0xffff;
+                    width = 4;
+                    break;
+                case 4:
+                    mask = 0xffffffff;
+                    width = 8;
+                    break;
+                default:
+                    width = 0;
+                    break;
             }
             break;
         case FMT_BASE_10:
             base = 10;
+            switch (width) {
+                case 1:
+                    mask = 0xff;
+                    width = 3;
+                    sign_bit = ((val & 0x80) != 0);
+                    break;  
+                case 2:
+                    mask = 0xffff;
+                    width = 5;
+                    sign_bit = ((val & 0x8000) != 0);
+                    break;
+                case 4:
+                    mask = 0xffffffff;
+                    width = 10;
+                    sign_bit = ((val & 0x80000000) != 0);
+                    break;
+                default:
+                    width = 0;
+                    sign_bit = ((val & 0x80000000) != 0);
+                    break;
+            }
             if (fmt & FMT_ALTERNATE_FORM) {
                 *d++ = '0';
                 *d++ = '.';
-                width = width - 2;
             }
             break;
+        default:
+            break;
     }
+    /* this assumes if you send it a byte, it gets promoted and sign extended */
+    if ((fmt & (FMT_SIGNED | FMT_BASE_MASK)) == (FMT_SIGNED | FMT_BASE_10)) {
+        val = (val & 0x80000000) ? -val : val;
+    }
+    val = val & mask;
 
-    if (val == 0) {
-        *d++ = '0';
-    } else {
-        while (val > 0) {
-            *d++ = ((val % base) < 10) ? (val % base) + '0' :
+    do {
+        *d++ = ((val % base) < 10) ? (val % base) + '0' :
                                                  (val % base) + '7';
-            val /= base;
-            width--;
-        }
-    }
+        val /= base;
+        width--;
+    } while (val > 0);
 
     if (fmt & FMT_LEADING_ZERO) {
         while (width > 0) {
@@ -829,17 +916,11 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
                 break;
         }
     }
-    if (sign_bit) {
+    if (sign_bit && (fmt & FMT_SIGNED)) {
         *d++ = '-';
         width--;
     }
 
-    if ((width > 0) && ((FMT_LEFT_ADJUST & fmt) == 0)) {
-        while (width) {
-            *d++ = ' ';
-            width--;
-        }
-    }
     /*
      * So how often do you get to use an interview question in your
      * code? 
@@ -852,16 +933,6 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
         *buf ^= *d;
         *d ^= *buf;
     } while (++buf < --d);
-    if ((width > 0) && ((FMT_LEFT_ADJUST & fmt) != 0)) {
-        while (*d != '\000') {
-            d++;
-        }
-        while (width) {
-            *d++ = ' ';
-            width--;
-        }
-        *d = '\000';
-    }
     return;
 }
 
@@ -871,6 +942,7 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
  * Assumes:
  *      - Stops at first non-legal digit in guessed
  *        base or NUL character.
+ *      - only does signed input on decimal numbers
  * Returns:
  *      - 0 even on failure.
  */
@@ -878,11 +950,15 @@ uint32_t
 aton(char *buf) {
     uint32_t res = 0;
     int     base = 10;
-    char    *t = buf;
+    int     sign_bit = 0;
     uint8_t digit;
 
     /* check for different base indicators */
-    if ((*buf >= '1') && (*buf <= '9')) {
+    if (((*buf >= '1') && (*buf <= '9')) || (*buf == '-')) {
+        if (*buf == '-') {
+            sign_bit = 1;
+            buf++;
+        }
         base = 10;
     } else if ((*buf) == '0') {
         buf++;
@@ -894,7 +970,7 @@ aton(char *buf) {
             buf++;
         } else if ((*buf >= '0') && (*buf <= '7')) {
             base = 8;
-        } else if (*buf = '\000') {
+        } else if (*buf == '\000') {
             return 0;
         }
     }
@@ -904,50 +980,19 @@ aton(char *buf) {
             ((base == 8) && (digit > 7)) ||
             ((base == 10) && (digit > 9)) ||
             ((base == 16) && (digit > 15))) {
-            return res;
+            return (sign_bit) ? -res : res;
         }
         res *= base;
         res += digit;
         buf++;
     }
-    return res;
+    return (sign_bit) ? -res : res;
 }
 
 
 /*
  * Print a number given various formatting options.
  * NB: No floating point yet. 
- *
- * This got a bit out of hand but I wanted just *one* number printing
- * function rather than several. 
- *
- * Notes from my notebook:
- * Number consists of:
- *
- *      PREFIX|NUMBER|SUFFIX
- *     |------ width -------|
- *     |------ field width -----|
-
- * Prefix is one of "", "-", "0x", "0b", "0", "-0x" "-0b", "-0"
- * Suffix is one of "", ".0"
- *
- * The independent variable is the leading zero question.
- * So when LEADING ZERO is set you pad the width of Number to fill
- * the width, up to 32 bits of precision.
- *
- * With LEFT adjust you pad right, without it you pad left.
- *
- * Examples:
- *   0x12345000 - hex + alternate form
- *     1234abcd - just hex 
- *           0C - hex + width of 2 + leading 0
- *         10.0 - decimal + alternate form
- *      0b11011 - Binary + alternate form
- *   0b00011011 - Binary + alternate form + leading 0 + 8 digits
- *   123        - Decimal + left adjust + width of 10
- *          010 - octal
- * 037777777777 - octal equivalent of -1
- *         -1.0 - decimal + sign + alternate form (adds the .0)
  *
  */
 void
@@ -959,4 +1004,19 @@ uart_putnum(int chan, uint16_t fmt, uint32_t num) {
     if (fmt & FMT_NEWLINE) {
         uart_puts(chan, "\n");
     }
+}
+
+/*
+ * uart_getnum
+ *
+ * Read a number in from the specified channel. Accepts base
+ * decorators (like 0x) to distinguish hexadecimal numbers from
+ * decimal ones. See aton for the list.
+ */
+uint32_t
+uart_getnum(int chan) {
+    char buf[48];
+
+    uart_gets(chan, buf, 48);
+    return aton(buf);
 }

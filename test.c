@@ -47,13 +47,13 @@ main(void) {
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BASE_8 | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_2 | FMT_LEADING_ZERO | FMT_ALTERNATE_FORM | 10, n & 0xff);
+        uart_putnum(u, FMT_BASE_2 | FMT_LEADING_ZERO | FMT_ALTERNATE_FORM | 1, n & 0xff);
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BASE_16 | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 2, n & 0xff);
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 1, n);
         uart_puts(u, " -- ");
-        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 8, n & 0xffff);
+        uart_putnum(u, FMT_BASE_16 | FMT_LEADING_ZERO | 2, n);
         uart_puts(u, "\n");
     }
     while (1) {
@@ -67,6 +67,8 @@ main(void) {
         uart_gets(u, buf, 128);
         n = aton(buf);
         uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM, n);
+        uart_puts(u, " -- ");
+        uart_putnum(u, FMT_BASE_10 | FMT_ALTERNATE_FORM | FMT_SIGNED, n);
         uart_puts(u, " -- ");
         uart_putnum(u, FMT_BASE_2 | FMT_ALTERNATE_FORM, n);
         uart_puts(u, " -- ");
