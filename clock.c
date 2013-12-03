@@ -33,6 +33,7 @@ void
 sys_tick_handler(void) {
     system_millis++;
 #ifdef SYSTICK_HEARTBEAT
+    /* Generate a 2Hz heart beep blink */
     if ((system_millis % 500) == 0) {
         gpio_toggle(GPIOD, GPIO15); // BLUE led
     }
@@ -54,11 +55,17 @@ uint32_t mtime() {
 static void
 systick_setup(int tick_rate) {
     /* clock rate / 1000 to get 1mS interrupt rate */
-    systick_set_reload(168000000 / tick_rate);
-    systick_set_clocksource(STK_CTRL_CLKSOURCE_AHB);
+    systick_set_reload((168000000) / tick_rate);
+    STK_CTRL = 0x07;
+#if 0
+    /* libopencm3 bug, the above assign does all three of these
+     * steps, but systick_set_clocksource fails to set the clock
+     * source to AHB because it doesn't correctly shift the value
+     */
+    systick_set_clocksource(1);
     systick_counter_enable();
-    /* this done last */
     systick_interrupt_enable();
+#endif
 }
 
 /* Set STM32 to 168 MHz. */

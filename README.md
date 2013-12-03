@@ -16,6 +16,18 @@ infrastructure.
 
 [a]:https://github.com/libopencm3/libopencm3
 
+In addition there is some number formatting code (ntoa) which, yes, is 
+basically a re-implementation of some of the capabilities of `printf` 
+except that I find its harder to find just the 'formatting' code from
+printf these days. And since I have been having issues getting newlib
+to do what I want on a bare metal platform, I once again wrote some number
+formatting code. Basically it prints numbers as either decimal, binary,
+octal, or hex. And it can add some decoration to indicated their base
+(decimals end in .0, octal starts with a leading 0, binary with 0b, and
+hexadecimal with 0x) The goal being a companion 'getnum' which can reverse
+that and process any base number. The combination being useful in the
+development of a small embedded monitor for the ARM chip.
+
 Comments or questions to me.
 
 --Chuck
