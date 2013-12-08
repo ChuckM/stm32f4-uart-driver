@@ -38,7 +38,11 @@ enum UART_PORT_PIN {
 };
 
 /* Defines for the putnum function */
-#define FMT_WIDTH_MASK      0x1f << 0
+#define FMT_SIZE_MASK      0xf << 0
+#define FMT_SIZE_BYTE       1
+#define FMT_SIZE_WORD       2
+#define FMT_SIZE_LONG       4
+// #define FMT_SIZE_LONGLONG    8       // reserved
 #define FMT_BASE_10         0 << 5
 #define FMT_BASE_2          1 << 5
 #define FMT_BASE_8          2 << 5
@@ -50,18 +54,21 @@ enum UART_PORT_PIN {
 #define FMT_LEFT_ADJUST     1 << 10 
 #define FMT_NEWLINE         1 << 11
 #define FMT_DECIMAL         FMT_BASE_10 | FMT_ALTERNATE_FORM | FMT_SIGNED
-#define FMT_HEX_BYTE        FMT_BASE_16 | FMT_LEADING_ZERO | 1
-#define FMT_HEX_WORD        FMT_BASE_16 | FMT_LEADING_ZERO | 3
-#define FMT_HEX_LONG        FMT_BASE_16 | FMT_LEADING_ZERO | 7
-#define FMT_BINARY_BYTE     FMT_BASE_2 | FMT_LEADING_ZERO | 7
-#define FMT_BINARY_WORD     FMT_BASE_2 | FMT_LEADING_ZERO | 15
-#define FMT_BINARY_LONG     FMT_BASE_2 | FMT_LEADING_ZERO | 31
+#define FMT_HEX_BYTE        FMT_BASE_16 | FMT_LEADING_ZERO | FMT_SIZE_BYTE
+#define FMT_HEX_WORD        FMT_BASE_16 | FMT_LEADING_ZERO | FMT_SIZE_WORD
+#define FMT_HEX_LONG        FMT_BASE_16 | FMT_LEADING_ZERO | FMT_SIZE_LONG
+#define FMT_BINARY_BYTE     FMT_BASE_2 | FMT_LEADING_ZERO | FMT_SIZE_BYTE
+#define FMT_BINARY_WORD     FMT_BASE_2 | FMT_LEADING_ZERO | FMT_SIZE_WORD
+#define FMT_BINARY_LONG     FMT_BASE_2 | FMT_LEADING_ZERO | FMT_SIZE_LONG
 #define FMT_HEX_CONSTANT    FMT_BASE_16 | FMT_ALTERNATE_FORM
 
 /* Formatting discussion :
  * So the interesting thing here is that when you try to format -1 as
  * a byte it shows up as FFFFFFFF rather than FF. So to get that behavior
  * we're going to cut off the number if its all 1 bits.
+ *
+ * To address the above and other issues, we add the 'size' flag which
+ * is the natural size of the number.
  */
 
 /* Prototypes */

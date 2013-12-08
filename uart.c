@@ -778,7 +778,7 @@ void
 ntoa(uint32_t val, uint16_t fmt, char *buf) {
     char *d;
     uint32_t mask;
-    int base, width;
+    int base, size, width;
     int sign_bit = 0;
 
     d = buf;
@@ -787,12 +787,13 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
     // defaults if not specified
     mask = 0xffffffff;
     base = 10;
-    width = fmt & FMT_WIDTH_MASK;
+    width = 0;
+    size = fmt & FMT_SIZE_MASK;
     /* sigh how to make this cleaner? */
     switch (fmt & FMT_BASE_MASK) {
         case FMT_BASE_2:
             base = 2;
-            switch (width) {
+            switch (size) {
                 case 1:
                     mask = 0xff;
                     width = 8;
@@ -812,7 +813,7 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
             break;
         case FMT_BASE_8:
             base = 8;
-            switch (width) {
+            switch (size) {
                 case 1:
                     mask = 0xff;
                     width = 3;
@@ -832,7 +833,7 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
             break;
         case FMT_BASE_16:
             base = 16;
-            switch (width) {
+            switch (size) {
                 case 1:
                     mask = 0xff;
                     width = 2;
@@ -852,7 +853,7 @@ ntoa(uint32_t val, uint16_t fmt, char *buf) {
             break;
         case FMT_BASE_10:
             base = 10;
-            switch (width) {
+            switch (size) {
                 case 1:
                     mask = 0xff;
                     width = 3;

@@ -17,7 +17,7 @@
 ## along with this library.  If not, see <http://www.gnu.org/licenses/>.
 ##
 
-OBJS = uart.o clock.o debug.o
+OBJS = uart.o clock.o debug.o term.o
 BINARY = test
 
 LDSCRIPT = stm32f4-discovery.ld
